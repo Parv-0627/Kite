@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kite — Virtual Trading</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#fff;color:#333;height:100vh;display:flex;flex-direction:column;overflow:hidden;font-size:12px}
+
+/* TOP BAR */
+.topbar{background:#fff;border-bottom:1px solid #e8e8e8;padding:0 12px;display:flex;align-items:center;gap:0;height:44px;flex-shrink:0}
+.topbar .indices{display:flex;gap:16px;flex:1}
+.idx{font-size:11px;color:#333;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.idx .sym{font-weight:600}
+.idx .val{font-weight:600}
+.up{color:#1a7a4a}.dn{color:#c0392b}
+.topbar-right{display:flex;align-items:center;gap:16px;margin-left:auto}
+.topbar-right .nav-item{font-size:12px;color:#666;cursor:pointer;padding:4px 8px;border-radius:4px}
+.topbar-right .nav-item:hover{background:#f5f5f5;color:#387ED1}
+.topbar-right .nav-item.active{color:#387ED1;font-weight:600}
+.topbar-right .funds{font-size:11px;color:#666}
+.topbar-right .funds span{color:#333;font-weight:600}
+.user-badge{background:#f5f5f5;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#387ED1;cursor:pointer}
+
+/* MAIN */
+.main{display:flex;flex:1;overflow:hidden}
+
+/* LEFT SIDEBAR */
+.sidebar{width:260px;background:#fff;border-right:1px solid #e8e8e8;display:flex;flex-direction:column;flex-shrink:0}
+.search-wrap{padding:8px;border-bottom:1px solid #e8e8e8;display:flex;align-items:center;gap:6px}
+.search-wrap input{flex:1;padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:4px;background:#f9f9f9;outline:none}
+.search-wrap input:focus{border-color:#387ED1;background:#fff}
+.wl-header{padding:6px 12px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#999;border-bottom:1px solid #f0f0f0}
+.wl-header span{font-weight:600;color:#333}
+.watchlist{flex:1;overflow-y:auto}
+.witem{padding:8px 12px;border-bottom:1px solid #f5f5f5;cursor:pointer;display:flex;align-items:center;justify-content:space-between;position:relative}
+.witem:hover{background:#f8fbff}
+.witem.active{background:#EBF2FC;border-left:2px solid #387ED1}
+.witem .left .sym{font-size:12px;font-weight:600;color:#333}
+.witem .left .exch{font-size:10px;color:#999;margin-top:1px}
+.witem .right{text-align:right}
+.witem .right .ltp{font-size:12px;font-weight:600}
+.witem .right .chg{font-size:10px;margin-top:1px}
+.witem-actions{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;gap:2px;background:#fff;border:1px solid #e8e8e8;border-radius:4px;padding:2px}
+.witem:hover .witem-actions{display:flex}
+.witem:hover .right{display:none}
+.wact{padding:3px 6px;font-size:10px;border:none;border-radius:3px;cursor:pointer;font-weight:600}
+.wact.b{background:#1a7a4a;color:#fff}
+.wact.s{background:#c0392b;color:#fff}
+
+/* CONTENT AREA */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+
+/* CHART TABS */
+.chart-tabs{display:flex;border-bottom:1px solid #e8e8e8;padding:0 12px;background:#fff;flex-shrink:0}
+.ctab{padding:10px 14px;font-size:12px;color:#999;cursor:pointer;border-bottom:2px solid transparent}
+.ctab:hover{color:#387ED1}
+.ctab.active{color:#387ED1;border-bottom:2px solid #387ED1;font-weight:600}
+
+/* CHART AREA */
+.chart-section{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.chart-header{padding:8px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f0f0f0;flex-wrap:wrap;flex-shrink:0}
+.sym-block .sname{font-size:13px;font-weight:600}
+.sym-block .sltp{font-size:20px;font-weight:600;line-height:1}
+.sym-block .schg{font-size:11px;margin-top:2px}
+.ohlc{display:flex;gap:12px;font-size:11px;color:#888;align-items:center}
+.ohlc b{color:#333}
+.chart-toolbar{display:flex;gap:6px;margin-left:auto;align-items:center}
+.tf-btn{padding:3px 8px;font-size:11px;border:1px solid #ddd;border-radius:3px;background:#fff;color:#666;cursor:pointer}
+.tf-btn:hover{border-color:#387ED1;color:#387ED1}
+.tf-btn.active{background:#387ED1;color:#fff;border-color:#387ED1;font-weight:600}
+.chart-type-btn{padding:3px 8px;font-size:11px;border:1px solid #ddd;border-radius:3px;background:#fff;color:#666;cursor:pointer}
+.chart-type-btn.active{background:#f0f0f0;font-weight:600}
+.chart-wrap{flex:1;position:relative;min-height:150px;padding:8px}
+#mainChart{width:100%!important;height:100%!important}
+
+/* ORDER TICKET */
+.order-ticket{position:fixed;bottom:80px;right:16px;width:280px;background:#fff;border:1px solid #ddd;border-radius:6px;box-shadow:0 4px 20px rgba(0,0,0,0.15);display:none;z-index:100}
+.ot-header{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #e8e8e8}
+.ot-sym{font-size:13px;font-weight:600}
+.ot-close{cursor:pointer;color:#999;font-size:16px;line-height:1}
+.ot-tabs{display:flex;border-bottom:1px solid #e8e8e8}
+.ot-tab{flex:1;padding:8px;text-align:center;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent}
+.ot-tab.buy{color:#1a7a4a}
+.ot-tab.sell{color:#c0392b}
+.ot-tab.buy.active{border-bottom:2px solid #1a7a4a;background:#f0faf5}
+.ot-tab.sell.active{border-bottom:2px solid #c0392b;background:#fdf5f5}
+.ot-body{padding:12px}
+.ot-row{display:flex;gap:8px;margin-bottom:10px}
+.ot-field{flex:1;display:flex;flex-direction:column;gap:3px}
+.ot-field label{font-size:10px;color:#888;font-weight:500}
+.ot-field select,.ot-field input{padding:6px 8px;font-size:12px;border:1px solid #ddd;border-radius:4px;width:100%;outline:none}
+.ot-field select:focus,.ot-field input:focus{border-color:#387ED1}
+.ot-footer{padding:0 12px 12px;display:flex;gap:8px}
+.ot-btn{flex:1;padding:9px;font-size:12px;font-weight:600;border:none;border-radius:4px;cursor:pointer;color:#fff}
+.ot-btn.buy{background:#1a7a4a}
+.ot-btn.sell{background:#c0392b}
+.ot-margin{font-size:10px;color:#888;text-align:center;padding:0 12px 8px}
+.ot-margin span{color:#333;font-weight:600}
+
+/* BOTTOM PANEL */
+.bottom-panel{background:#fff;border-top:1px solid #e8e8e8;flex-shrink:0}
+.bp-tabs{display:flex;padding:0 12px;border-bottom:1px solid #e8e8e8}
+.bp-tab{padding:8px 14px;font-size:11px;color:#999;cursor:pointer;border-bottom:2px solid transparent}
+.bp-tab:hover{color:#387ED1}
+.bp-tab.active{color:#387ED1;border-bottom:2px solid #387ED1;font-weight:600}
+.bp-content{max-height:160px;overflow-y:auto}
+.bp-table{width:100%;font-size:11px;border-collapse:collapse}
+.bp-table th{padding:6px 10px;text-align:left;color:#888;font-weight:500;border-bottom:1px solid #f0f0f0;background:#fafafa;white-space:nowrap}
+.bp-table td{padding:7px 10px;border-bottom:1px solid #f5f5f5;white-space:nowrap}
+.bp-table tr:hover td{background:#f8fbff}
+.sell-link{color:#c0392b;cursor:pointer;font-weight:600;font-size:10px;border:1px solid #c0392b;padding:2px 6px;border-radius:3px}
+.sell-link:hover{background:#c0392b;color:#fff}
+.empty-row td{text-align:center;color:#bbb;padding:20px}
+
+/* OPTION CHAIN */
+.oc-wrap{padding:10px}
+.oc-filter{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.oc-filter select,.oc-filter input{padding:5px 8px;font-size:11px;border:1px solid #ddd;border-radius:4px;outline:none}
+.oc-table{width:100%;font-size:11px;border-collapse:collapse}
+.oc-table th{padding:6px 8px;text-align:center;color:#888;font-weight:500;border-bottom:1px solid #e8e8e8;background:#fafafa}
+.oc-table td{padding:5px 8px;text-align:center;border-bottom:1px solid #f5f5f5;cursor:pointer}
+.oc-table tr:hover td{background:#f8fbff}
+.oc-ce{background:#fff3e0;font-weight:600}
+.oc-pe{background:#e8f5e9;font-weight:600}
+.oc-strike{background:#f5f5f5;font-weight:700;color:#333;font-size:12px}
+.oc-itm-ce{background:#fff8e1}
+.oc-itm-pe{background:#e8f5e9}
+.atm-row td{font-weight:700;border-top:2px solid #387ED1;border-bottom:2px solid #387ED1}
+
+/* PORTFOLIO BAR */
+.pbar{display:flex;gap:20px;padding:6px 12px;background:#fafafa;border-top:1px solid #e8e8e8;font-size:11px;flex-shrink:0;flex-wrap:wrap}
+.ps{display:flex;flex-direction:column}
+.ps label{font-size:9px;color:#999;font-weight:500;text-transform:uppercase}
+.ps span{font-size:12px;font-weight:600;color:#333;margin-top:1px}
+
+/* TOAST */
+.toast{position:fixed;top:50px;right:16px;padding:10px 16px;border-radius:4px;font-size:12px;font-weight:500;display:none;z-index:999;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+
+/* FUNDS PANEL */
+.funds-panel{padding:16px;max-height:160px;overflow-y:auto}
+.funds-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fund-card{background:#fafafa;border:1px solid #e8e8e8;border-radius:6px;padding:10px}
+.fund-card label{font-size:10px;color:#888;display:block}
+.fund-card .val{font-size:16px;font-weight:600;color:#333;margin-top:2px}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="indices" id="idxBar"></div>
+  <div class="topbar-right">
+    <div class="nav-item active" onclick="showSection('chart')">Chart</div>
+    <div class="nav-item" onclick="showSection('orders')">Orders</div>
+    <div class="nav-item" onclick="showSection('holdings')">Holdings</div>
+    <div class="nav-item" onclick="showSection('positions')">Positions</div>
+    <div class="nav-item" onclick="showSection('funds')">Funds</div>
+    <div class="funds">Available: <span id="topFunds">₹10,00,000</span></div>
+    <div class="user-badge">YB</div>
+  </div>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="search-wrap">
+      <input placeholder="Search eg: INFY, NIFTY..." id="searchInput">
+    </div>
+    <div class="wl-header"><span>Default (10)</span><span>1 / 5</span></div>
+    <div class="watchlist" id="watchlistEl"></div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content" id="mainContent">
+
+    <!-- CHART VIEW -->
+    <div id="chartView" style="display:flex;flex-direction:column;flex:1;overflow:hidden">
+      <div class="chart-tabs">
+        <div class="ctab active" onclick="setChartTab('chart',this)">Chart</div>
+        <div class="ctab" onclick="setChartTab('optionchain',this)">Option chain</div>
+        <div class="ctab" onclick="setChartTab('fundamentals',this)">Fundamentals</div>
+      </div>
+
+      <!-- CHART -->
+      <div id="chartPane" class="chart-section">
+        <div class="chart-header">
+          <div class="sym-block">
+            <div class="sname" id="selSym">NIFTY BANK</div>
+            <div class="sltp up" id="selLtp">53,643.10</div>
+            <div class="schg dn" id="selChg">-596.10 (-1.10%)</div>
+          </div>
+          <div class="ohlc">
+            <span>O: <b id="oV">-</b></span>
+            <span>H: <b id="hV">-</b></span>
+            <span>L: <b id="lV">-</b></span>
+            <span>C: <b id="cV">-</b></span>
+          </div>
+          <div class="chart-toolbar">
+            <button class="chart-type-btn active" onclick="setChartType('candle',this)">🕯 Candle</button>
+            <button class="chart-type-btn" onclick="setChartType('line',this)">📈 Line</button>
+            <div style="width:1px;background:#e8e8e8;height:20px;margin:0 4px"></div>
+            <button class="tf-btn active" onclick="setTf(this,'1m')">1m</button>
+            <button class="tf-btn" onclick="setTf(this,'5m')">5m</button>
+            <button class="tf-btn" onclick="setTf(this,'15m')">15m</button>
+            <button class="tf-btn" onclick="setTf(this,'1h')">1h</button>
+            <button class="tf-btn" onclick="setTf(this,'1d')">1D</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+      </div>
+
+      <!-- OPTION CHAIN -->
+      <div id="optionChainPane" style="display:none;flex:1;overflow-y:auto">
+        <div class="oc-wrap">
+          <div class="oc-filter">
+            <span style="font-size:12px;font-weight:600" id="ocSym">NIFTY BANK</span>
+            <select id="ocExpiry"><option>05 Jun 2026</option><option>12 Jun 2026</option><option>19 Jun 2026</option><option>26 Jun 2026</option></select>
+            <span style="font-size:11px;color:#888">Spot: <b id="ocSpot">53,643</b></span>
+            <button onclick="buildOptionChain()" style="padding:4px 10px;font-size:11px;border:1px solid #387ED1;color:#387ED1;border-radius:4px;background:#fff;cursor:pointer">Refresh</button>
+          </div>
+          <table class="oc-table">
+            <tr>
+              <th colspan="4" style="background:#fff3e0;color:#c0392b">CALLS</th>
+              <th class="oc-strike">Strike</th>
+              <th colspan="4" style="background:#e8f5e9;color:#1a7a4a">PUTS</th>
+            </tr>
+            <tr>
+              <th>OI</th><th>Vol</th><th>LTP</th><th>Chg%</th>
+              <th class="oc-strike">Price</th>
+              <th>Chg%</th><th>LTP</th><th>Vol</th><th>OI</th>
+            </tr>
+            <tbody id="ocBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- FUNDAMENTALS -->
+      <div id="fundamentalsPane" style="display:none;flex:1;overflow-y:auto;padding:16px">
+        <div id="fundContent"></div>
+      </div>
+    </div>
+
+    <!-- BOTTOM PANEL -->
+    <div class="bottom-panel">
+      <div class="bp-tabs">
+        <div class="bp-tab active" onclick="setBpTab('positions',this)">Positions <span id="posCount" style="background:#e8e8e8;border-radius:10px;padding:1px 6px;font-size:10px">0</span></div>
+        <div class="bp-tab" onclick="setBpTab('holdings',this)">Holdings <span id="holdCount" style="background:#e8e8e8;border-radius:10px;padding:1px 6px;font-size:10px">0</span></div>
+        <div class="bp-tab" onclick="setBpTab('orders',this)">Orders <span id="ordCount" style="background:#e8e8e8;border-radius:10px;padding:1px 6px;font-size:10px">0</span></div>
+        <div class="bp-tab" onclick="setBpTab('funds',this)">Funds</div>
+      </div>
+      <div class="bp-content" id="bpContent"></div>
+    </div>
+
+    <div class="pbar">
+      <div class="ps"><label>Margin Available</label><span id="pb1">₹10,00,000</span></div>
+      <div class="ps"><label>Used Margin</label><span id="pb2">₹0</span></div>
+      <div class="ps"><label>Open P&L</label><span id="pb3" class="up">+₹0</span></div>
+      <div class="ps"><label>Day P&L</label><span id="pb4" class="up">+₹0</span></div>
+      <div class="ps"><label>Portfolio Value</label><span id="pb5">₹10,00,000</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ORDER TICKET -->
+<div class="order-ticket" id="orderTicket">
+  <div class="ot-header">
+    <div class="ot-sym" id="otSym">NIFTY BANK</div>
+    <div class="ot-close" onclick="closeTicket()">✕</div>
+  </div>
+  <div class="ot-tabs">
+    <div class="ot-tab buy active" id="otBuy" onclick="setOtSide('buy')">BUY</div>
+    <div class="ot-tab sell" id="otSell" onclick="setOtSide('sell')">SELL</div>
+  </div>
+  <div class="ot-body">
+    <div class="ot-row">
+      <div class="ot-field"><label>PRODUCT</label><select id="otProd"><option>MIS</option><option>CNC</option><option>NRML</option></select></div>
+      <div class="ot-field"><label>ORDER TYPE</label><select id="otType"><option>Market</option><option>Limit</option><option>SL</option><option>SL-M</option></select></div>
+    </div>
+    <div class="ot-row">
+      <div class="ot-field"><label>QTY</label><input type="number" id="otQty" value="1" min="1" oninput="updateOtMargin()"></div>
+      <div class="ot-field"><label>PRICE</label><input type="number" id="otPrice" value="0" oninput="updateOtMargin()"></div>
+    </div>
+  </div>
+  <div class="ot-margin">Margin Required: <span id="otMargin">₹0</span></div>
+  <div class="ot-footer">
+    <button class="ot-btn buy" id="otBtn" onclick="placeOrder()">BUY</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const stocks=[
+  {sym:'NIFTY BANK',exch:'NSE',base:53643,o:54100,h:54280,l:53400,c:54239,lot:15},
+  {sym:'NIFTY 50',exch:'NSE',base:23382,o:23550,h:23600,l:23300,c:23547,lot:50},
+  {sym:'SENSEX',exch:'BSE',base:74267,o:74700,h:74800,l:74100,c:74775,lot:1},
+  {sym:'NIFTY MID SELECT',exch:'NSE',base:14264,o:14400,h:14450,l:14200,c:14474,lot:1},
+  {sym:'RELIANCE',exch:'NSE',base:2945,o:2930,h:2960,l:2920,c:2935,lot:1},
+  {sym:'TCS',exch:'NSE',base:3812,o:3800,h:3840,l:3790,c:3805,lot:1},
+  {sym:'INFY',exch:'NSE',base:1678,o:1670,h:1695,l:1665,c:1672,lot:1},
+  {sym:'HDFC BANK',exch:'NSE',base:1723,o:1715,h:1735,l:1710,c:1718,lot:1},
+  {sym:'SUZLON',exch:'BSE',base:53.89,o:57,h:57.5,l:53,c:57.18,lot:1},
+  {sym:'ICICI BANK',exch:'NSE',base:1298,o:1290,h:1310,l:1285,c:1295,lot:1},
+];
+
+let prices=stocks.map(s=>({...s,ltp:s.base+(Math.random()-0.5)*s.base*0.005}));
+let selIdx=0,otSide='buy';
+let available=1000000,usedM=0,realisedPnl=0;
+let positions=[],holdings=[],orders=[];
+let chartData=[],chart,chartType='line';
+let bpTab='positions';
+
+const fi=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+const fn=n=>parseFloat(Math.abs(n)<100?n.toFixed(2):n.toFixed(0)).toLocaleString('en-IN');
+const fp=n=>(n>=0?'+':'')+fn(n);
+
+function genCandles(base,count){
+  let arr=[],p=base*0.985;
+  for(let i=0;i<count;i++){
+    let o=p,c=o+(Math.random()-0.48)*o*0.003;
+    let h=Math.max(o,c)+Math.random()*o*0.002;
+    let l=Math.min(o,c)-Math.random()*o*0.002;
+    arr.push({o,h,l,c,x:i});p=c;
+  }
+  return arr;
+}
+
+function buildWatchlist(){
+  const q=document.getElementById('searchInput').value.toLowerCase();
+  const el=document.getElementById('watchlistEl');
+  const list=prices.filter(s=>s.sym.toLowerCase().includes(q));
+  el.innerHTML=list.map((s,i)=>{
+    const ri=prices.indexOf(s);
+    const chg=s.ltp-s.c,pct=(chg/s.c*100);
+    const cls=chg>=0?'up':'dn';
+    return`<div class="witem${ri===selIdx?' active':''}" onclick="selectStock(${ri})">
+      <div class="left"><div class="sym">${s.sym}</div><div class="exch">${s.exch}</div></div>
+      <div class="right">
+        <div class="ltp ${cls}">${fn(s.ltp)}</div>
+        <div class="chg ${cls}">${fp(pct)}%</div>
+      </div>
+      <div class="witem-actions">
+        <button class="wact b" onclick="event.stopPropagation();openTicket(${ri},'buy')">B</button>
+        <button class="wact s" onclick="event.stopPropagation();openTicket(${ri},'sell')">S</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function buildIdxBar(){
+  document.getElementById('idxBar').innerHTML=prices.slice(0,4).map(s=>{
+    const chg=s.ltp-s.c,pct=(chg/s.c*100);
+    const cls=chg>=0?'up':'dn';
+    return`<div class="idx"><span class="sym">${s.sym}</span> <span class="val ${cls}">${fn(s.ltp)}</span> <span class="${cls}">${fp(pct)}%</span></div>`;
+  }).join('');
+}
+
+function updateHeader(){
+  const s=prices[selIdx];
+  const chg=s.ltp-s.c,pct=(chg/s.c*100);
+  const cls=chg>=0?'up':'dn';
+  document.getElementById('selSym').textContent=s.sym;
+  document.getElementById('selLtp').textContent=fn(s.ltp);
+  document.getElementById('selLtp').className='sltp '+cls;
+  document.getElementById('selChg').textContent=(chg>=0?'+':'')+fn(chg)+' ('+(chg>=0?'+':'')+pct.toFixed(2)+'%)';
+  document.getElementById('selChg').className='schg '+cls;
+  document.getElementById('oV').textContent=fn(s.o);
+  document.getElementById('hV').textContent=fn(s.h);
+  document.getElementById('lV').textContent=fn(s.l);
+  document.getElementById('cV').textContent=fn(s.c);
+  document.getElementById('ocSym').textContent=s.sym;
+  document.getElementById('ocSpot').textContent=fn(s.ltp);
+}
+
+function selectStock(i){
+  selIdx=i;buildWatchlist();updateHeader();
+  chartData=genCandles(prices[i].ltp,60);
+  updateChart();buildOptionChain();
+}
+
+function setTf(btn,tf){
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const c={'1m':60,'5m':48,'15m':36,'1h':24,'1d':20};
+  chartData=genCandles(prices[selIdx].ltp,c[tf]||60);
+  updateChart();
+}
+
+function setChartType(type,btn){
+  document.querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  chartType=type;updateChart();
+}
+
+function setChartTab(tab,el){
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('chartPane').style.display=tab==='chart'?'flex':'none';
+  document.getElementById('optionChainPane').style.display=tab==='optionchain'?'block':'none';
+  document.getElementById('fundamentalsPane').style.display=tab==='fundamentals'?'block':'none';
+  if(tab==='optionchain')buildOptionChain();
+  if(tab==='fundamentals')buildFundamentals();
+}
+
+function updateChart(){
+  if(!chart)return;
+  const s=prices[selIdx];
+  const isUp=chartData[chartData.length-1].c>=chartData[0].c;
+  const color=isUp?'#1a7a4a':'#c0392b';
+  if(chartType==='line'){
+    chart.config.type='line';
+    chart.data.labels=chartData.map((_,i)=>i);
+    chart.data.datasets=[{
+      data:chartData.map(d=>parseFloat(d.c.toFixed(2))),
+      borderColor:color,backgroundColor:color+'15',
+      borderWidth:1.5,pointRadius:0,fill:true,tension:0.3
+    }];
+  } else {
+    chart.config.type='bar';
+    chart.data.labels=chartData.map((_,i)=>i);
+    chart.data.datasets=[{
+      data:chartData.map(d=>parseFloat(d.c.toFixed(2))),
+      backgroundColor:chartData.map(d=>d.c>=d.o?'#1a7a4a':'#c0392b'),
+      borderColor:chartData.map(d=>d.c>=d.o?'#1a7a4a':'#c0392b'),
+      borderWidth:1,barPercentage:0.6
+    }];
+  }
+  chart.options.scales.y.position='right';
+  chart.update('none');
+}
+
+function initChart(){
+  const ctx=document.getElementById('mainChart').getContext('2d');
+  chartData=genCandles(prices[0].ltp,60);
+  const closes=chartData.map(d=>parseFloat(d.c.toFixed(2)));
+  chart=new Chart(ctx,{
+    type:'line',
+    data:{labels:closes.map((_,i)=>i),datasets:[{data:closes,borderColor:'#1a7a4a',backgroundColor:'#1a7a4a15',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,animation:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'₹'+fn(ctx.raw)}}},
+      scales:{
+        x:{display:false},
+        y:{position:'right',grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10},callback:v=>fn(v)}}
+      }
+    }
+  });
+}
+
+function buildOptionChain(){
+  const spot=prices[selIdx].ltp;
+  const atm=Math.round(spot/100)*100;
+  const strikes=[];
+  for(let i=-6;i<=6;i++)strikes.push(atm+i*100);
+  const body=document.getElementById('ocBody');
+  body.innerHTML=strikes.map(k=>{
+    const diff=(k-spot)/spot;
+    const cLtp=Math.max(0.05,(spot-k+Math.random()*50+50)).toFixed(2);
+    const pLtp=Math.max(0.05,(k-spot+Math.random()*50+50)).toFixed(2);
+    const cOi=(Math.random()*500000).toFixed(0);
+    const pOi=(Math.random()*500000).toFixed(0);
+    const cVol=(Math.random()*100000).toFixed(0);
+    const pVol=(Math.random()*100000).toFixed(0);
+    const cChg=((Math.random()-0.5)*10).toFixed(2);
+    const pChg=((Math.random()-0.5)*10).toFixed(2);
+    const isAtm=k===atm;
+    const cItm=k<spot;const pItm=k>spot;
+    return`<tr${isAtm?' class="atm-row"':''}>
+      <td class="${cItm?'oc-itm-ce':''}" style="color:#888">${parseInt(cOi).toLocaleString()}</td>
+      <td class="${cItm?'oc-itm-ce':''}" style="color:#888">${parseInt(cVol).toLocaleString()}</td>
+      <td class="oc-ce" onclick="openTicket(selIdx,'buy')">${cLtp}</td>
+      <td class="${parseFloat(cChg)>=0?'up':'dn'}">${cChg}%</td>
+      <td class="oc-strike">${k.toLocaleString()}</td>
+      <td class="${parseFloat(pChg)>=0?'up':'dn'}">${pChg}%</td>
+      <td class="oc-pe" onclick="openTicket(selIdx,'buy')">${pLtp}</td>
+      <td class="${pItm?'oc-itm-pe':''}" style="color:#888">${parseInt(pVol).toLocaleString()}</td>
+      <td class="${pItm?'oc-itm-pe':''}" style="color:#888">${parseInt(pOi).toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+}
+
+function buildFundamentals(){
+  const s=prices[selIdx];
+  document.getElementById('fundContent').innerHTML=`
+    <h3 style="font-size:14px;font-weight:600;margin-bottom:12px">${s.sym} — Fundamentals</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+      ${[['Market Cap','₹'+Math.round(s.ltp*1000000/10000000)+'Cr'],['P/E Ratio',(15+Math.random()*20).toFixed(1)],['EPS','₹'+(s.ltp/20).toFixed(2)],['52W High',fn(s.ltp*1.25)],['52W Low',fn(s.ltp*0.75)],['Div Yield',(Math.random()*2).toFixed(2)+'%'],['Book Value','₹'+(s.ltp*0.8).toFixed(0)],['ROE',(Math.random()*25+5).toFixed(1)+'%'],['Debt/Equity',(Math.random()*1.5).toFixed(2)]].map(([l,v])=>`
+      <div style="background:#fafafa;border:1px solid #e8e8e8;border-radius:6px;padding:10px">
+        <div style="font-size:10px;color:#888">${l}</div>
+        <div style="font-size:14px;font-weight:600;margin-top:3px">${v}</div>
+      </div>`).join('')}
+    </div>`;
+}
+
+function openTicket(i,side){
+  selIdx=i;selectStock(i);
+  document.getElementById('orderTicket').style.display='block';
+  document.getElementById('otSym').textContent=prices[i].sym;
+  document.getElementById('otPrice').value=Math.round(prices[i].ltp);
+  setOtSide(side);updateOtMargin();
+}
+
+function closeTicket(){document.getElementById('orderTicket').style.display='none';}
+
+function setOtSide(side){
+  otSide=side;
+  document.getElementById('otBuy').className='ot-tab buy'+(side==='buy'?' active':'');
+  document.getElementById('otSell').className='ot-tab sell'+(side==='sell'?' active':'');
+  document.getElementById('otBtn').className='ot-btn '+side;
+  document.getElementById('otBtn').textContent=side.toUpperCase();
+}
+
+function updateOtMargin(){
+  const qty=parseInt(document.getElementById('otQty').value)||1;
+  const price=parseFloat(document.getElementById('otPrice').value)||prices[selIdx].ltp;
+  document.getElementById('otMargin').textContent=fi(qty*price);
+}
+
+function placeOrder(){
+  const qty=parseInt(document.getElementById('otQty').value)||1;
+  const price=parseFloat(document.getElementById('otPrice').value)||prices[selIdx].ltp;
+  const req=qty*price;
+  const s=prices[selIdx];
+  const time=new Date().toLocaleTimeString();
+  if(otSide==='buy'){
+    if(req>available){showToast('Insufficient margin!','#c0392b');return;}
+    available-=req;usedM+=req;
+    const ex=positions.find(p=>p.sym===s.sym);
+    if(ex){ex.qty+=qty;}
+    else positions.push({sym:s.sym,qty,buyPrice:price,idx:selIdx,product:document.getElementById('otProd').value});
+    orders.push({time,sym:s.sym,type:'BUY',qty,price,status:'Complete',product:document.getElementById('otProd').value});
+    showToast('✓ '+qty+' '+s.sym+' bought @ ₹'+fn(price),'#1a7a4a');
+  } else {
+    const pos=positions.find(p=>p.sym===s.sym);
+    if(!pos||pos.qty<qty){showToast('No/insufficient position!','#c0392b');return;}
+    const pnl=(price-pos.buyPrice)*qty;
+    available+=qty*price;usedM-=qty*pos.buyPrice;realisedPnl+=pnl;
+    pos.qty-=qty;
+    if(pos.qty<=0)positions=positions.filter(p=>p.sym!==s.sym);
+    orders.push({time,sym:s.sym,type:'SELL',qty,price,status:'Complete',product:document.getElementById('otProd').value});
+    showToast('✓ '+qty+' '+s.sym+' sold @ ₹'+fn(price)+' | P&L: '+(pnl>=0?'+':'')+fi(pnl),pnl>=0?'#1a7a4a':'#c0392b');
+  }
+  closeTicket();updateBpTab();updatePortfolio();updateCounts();
+}
+
+function sellPosition(sym){
+  const pos=positions.find(p=>p.sym===sym);
+  if(!pos)return;
+  const idx=prices.findIndex(s=>s.sym===sym);
+  const price=prices[idx].ltp;
+  const pnl=(price-pos.buyPrice)*pos.qty;
+  available+=pos.qty*price;usedM-=pos.qty*pos.buyPrice;realisedPnl+=pnl;
+  orders.push({time:new Date().toLocaleTimeString(),sym,type:'SELL',qty:pos.qty,price,status:'Complete',product:pos.product});
+  positions=positions.filter(p=>p.sym!==sym);
+  showToast('✓ '+sym+' position closed | P&L: '+(pnl>=0?'+':'')+fi(pnl),pnl>=0?'#1a7a4a':'#c0392b');
+  updateBpTab();updatePortfolio();updateCounts();
+}
+
+function setBpTab(tab,el){
+  document.querySelectorAll('.bp-tab').forEach(t=>t.classList.remove('active'));
+  if(el)el.classList.add('active');
+  bpTab=tab;updateBpTab();
+}
+
+function updateBpTab(){
+  const el=document.getElementById('bpContent');
+  if(bpTab==='positions'){
+    if(!positions.length){el.innerHTML='<table class="bp-table"><tr class="empty-row"><td colspan="7">No open positions</td></tr></table>';return;}
+    let openPnl=0;
+    positions.forEach(p=>{openPnl+=(prices[p.idx].ltp-p.buyPrice)*p.qty;});
+    el.innerHTML=`<table class="bp-table">
+      <tr><th>Symbol</th><th>Qty</th><th>Avg</th><th>LTP</th><th>P&L</th><th>Chg%</th><th></th></tr>
+      ${positions.map(p=>{
+        const ltp=prices[p.idx].ltp;
+        const pnl=(ltp-p.buyPrice)*p.qty;
+        const pct=((ltp-p.buyPrice)/p.buyPrice*100);
+        return`<tr>
+          <td><b>${p.sym}</b> <span style="color:#999;font-size:10px">${p.product||'MIS'}</span></td>
+          <td>${p.qty}</td><td>${fn(p.buyPrice)}</td>
+          <td class="${ltp>=p.buyPrice?'up':'dn'}">${fn(ltp)}</td>
+          <td class="${pnl>=0?'up':'dn'}">${pnl>=0?'+':''}${fi(pnl)}</td>
+          <td class="${pct>=0?'up':'dn'}">${fp(pct)}%</td>
+          <td><span class="sell-link" onclick="sellPosition('${p.sym}')">Exit</span></td>
+        </tr>`;
+      }).join('')}
+      <tr style="background:#fafafa;font-weight:600">
+        <td colspan="4">Total P&L</td>
+        <td class="${openPnl>=0?'up':'dn'}" colspan="3">${openPnl>=0?'+':''}${fi(openPnl)}</td>
+      </tr>
+    </table>`;
+  } else if(bpTab==='orders'){
+    if(!orders.length){el.innerHTML='<table class="bp-table"><tr class="empty-row"><td colspan="6">No orders today</td></tr></table>';return;}
+    el.innerHTML=`<table class="bp-table">
+      <tr><th>Time</th><th>Symbol</th><th>Type</th><th>Qty</th><th>Price</th><th>Status</th></tr>
+      ${orders.slice().reverse().map(o=>`<tr>
+        <td style="color:#888">${o.time}</td>
+        <td><b>${o.sym}</b></td>
+        <td class="${o.type==='BUY'?'up':'dn'}">${o.type}</td>
+        <td>${o.qty}</td><td>${fn(o.price)}</td>
+        <td style="color:#1a7a4a">● ${o.status}</td>
+      </tr>`).join('')}
+    </table>`;
+  } else if(bpTab==='holdings'){
+    el.innerHTML='<table class="bp-table"><tr class="empty-row"><td colspan="5">No holdings</td></tr></table>';
+  } else if(bpTab==='funds'){
+    el.innerHTML=`<div class="funds-panel"><div class="funds-grid">
+      <div class="fund-card"><label>Available Cash</label><div class="val">${fi(available)}</div></div>
+      <div class="fund-card"><label>Used Margin</label><div class="val">${fi(usedM)}</div></div>
+      <div class="fund-card"><label>Total Balance</label><div class="val">${fi(available+usedM)}</div></div>
+      <div class="fund-card"><label>Realised P&L</label><div class="val ${realisedPnl>=0?'up':'dn'}">${fi(realisedPnl)}</div></div>
+    </div></div>`;
+  }
+}
+
+function updatePortfolio(){
+  let openPnl=0;
+  positions.forEach(p=>{openPnl+=(prices[p.idx].ltp-p.buyPrice)*p.qty;});
+  document.getElementById('pb1').textContent=fi(available);
+  document.getElementById('pb2').textContent=fi(usedM);
+  document.getElementById('pb3').textContent=(openPnl>=0?'+':'')+fi(openPnl);
+  document.getElementById('pb3').className=openPnl>=0?'up':'dn';
+  document.getElementById('pb4').textContent=(realisedPnl>=0?'+':'')+fi(realisedPnl);
+  document.getElementById('pb4').className=realisedPnl>=0?'up':'dn';
+  document.getElementById('pb5').textContent=fi(available+usedM+openPnl);
+  document.getElementById('topFunds').textContent=fi(available);
+}
+
+function updateCounts(){
+  document.getElementById('posCount').textContent=positions.length;
+  document.getElementById('ordCount').textContent=orders.length;
+}
+
+function showToast(msg,bg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.background=bg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',3000);
+}
+
+function showSection(sec){
+  document.querySelectorAll('.topbar-right .nav-item').forEach(n=>n.classList.remove('active'));
+  event.target.classList.add('active');
+  if(sec==='positions')setBpTab('positions',document.querySelectorAll('.bp-tab')[0]);
+  if(sec==='holdings')setBpTab('holdings',document.querySelectorAll('.bp-tab')[1]);
+  if(sec==='orders')setBpTab('orders',document.querySelectorAll('.bp-tab')[2]);
+  if(sec==='funds')setBpTab('funds',document.querySelectorAll('.bp-tab')[3]);
+}
+
+document.getElementById('searchInput').addEventListener('input',buildWatchlist);
+
+initChart();buildWatchlist();buildIdxBar();updateHeader();updateBpTab();
+
+setInterval(()=>{
+  prices=prices.map(s=>({...s,ltp:Math.max(s.base*0.85,s.ltp+(Math.random()-0.49)*s.base*0.0006)}));
+  if(chartData.length>0){
+    const last=chartData[chartData.length-1];
+    const nc=Math.max(prices[selIdx].base*0.85,last.c+(Math.random()-0.49)*prices[selIdx].base*0.0006);
+    chartData.push({o:last.c,h:Math.max(last.c,nc),l:Math.min(last.c,nc),c:nc});
+    if(chartData.length>80)chartData.shift();
+    updateChart();
+  }
+  buildWatchlist();buildIdxBar();updateHeader();updatePortfolio();
+  if(bpTab==='positions')updateBpTab();
+},1500);
+</script>
+</body>
+</html>
